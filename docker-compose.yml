@@ -6,7 +6,7 @@ services:
     working_dir: /app
     environment:
       TZ: Asia/Shanghai
-      JAVA_OPTS: "-Xms128m -Xmx1024m"
+      JAVA_OPTS: "-Xms128m -Xmx1024m -Dfile.encoding=UTF-8"
     volumes:
       - ./target/modbusmaster.jar:/app/app.jar:ro
       - ./config/application.properties:/app/config/application.properties:ro
