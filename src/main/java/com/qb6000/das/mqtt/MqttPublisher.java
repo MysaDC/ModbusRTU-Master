@@ -35,6 +35,13 @@ public final class MqttPublisher implements Closeable {
         this.config = config;
     }
 
+    public synchronized void connect() throws MqttException {
+        if (closed.get()) {
+            throw new IllegalStateException("MQTT 发布器已关闭");
+        }
+        connectIfNeeded();
+    }
+
     public CompletableFuture<Void> publishAsync(String payload) {
         if (closed.get()) {
             return CompletableFuture.failedFuture(new IllegalStateException("MQTT 发布器已关闭"));

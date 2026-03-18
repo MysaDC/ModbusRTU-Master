@@ -35,6 +35,9 @@ public final class Main {
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
         MqttPublisher mqttPublisher = new MqttPublisher(config.mqtt());
+        mqttPublisher.connect();
+        log.info("MQTT 初始化连接成功。");
+
         List<ModbusReader> modbusReaders = new ArrayList<>();
         List<PollingService> pollingServices = new ArrayList<>();
 
