@@ -37,7 +37,7 @@ public final class MqttPublisher implements Closeable {
 
     public CompletableFuture<Void> publishAsync(String payload) {
         if (closed.get()) {
-            return CompletableFuture.failedFuture(new IllegalStateException("MqttPublisher is closed"));
+            return CompletableFuture.failedFuture(new IllegalStateException("MQTT 发布器已关闭"));
         }
 
         return CompletableFuture.runAsync(() -> {
@@ -75,9 +75,9 @@ public final class MqttPublisher implements Closeable {
             options.setPassword(config.password().toCharArray());
         }
 
-        log.info("Connecting MQTT broker: {}", config.brokerUri());
+        log.info("正在连接 MQTT Broker：{}", config.brokerUri());
         client.connect(options);
-        log.info("MQTT connected, topic={}", config.topic());
+        log.info("MQTT 连接成功，发布主题：{}", config.topic());
     }
 
     @Override
@@ -89,7 +89,7 @@ public final class MqttPublisher implements Closeable {
         publishExecutor.shutdown();
         try {
             if (!publishExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
-                log.warn("MQTT publish executor did not stop in time, forcing shutdown");
+                log.warn("MQTT 发布线程池未在超时时间内停止，执行强制关闭");
                 publishExecutor.shutdownNow();
             }
         } catch (InterruptedException ex) {
@@ -110,13 +110,13 @@ public final class MqttPublisher implements Closeable {
                 client.disconnect();
             }
         } catch (MqttException ex) {
-            log.warn("Error while disconnecting MQTT: {}", ex.getMessage());
+            log.warn("断开 MQTT 连接时发生异常：{}", ex.getMessage());
         }
 
         try {
             client.close();
         } catch (MqttException ex) {
-            log.warn("Error while closing MQTT client: {}", ex.getMessage());
+            log.warn("关闭 MQTT 客户端时发生异常：{}", ex.getMessage());
         }
 
         client = null;

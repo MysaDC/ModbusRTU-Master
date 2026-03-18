@@ -1,0 +1,20 @@
+services:
+  qb6000-das:
+    image: eclipse-temurin:21-jdk
+    container_name: qb6000-das
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "-Xms128m -Xmx1024m"
+    volumes:
+      - ./target/modbusmaster.jar:/app/app.jar:ro
+      - ./config/application.properties:/app/config/application.properties:ro
+    command: >
+      sh -c "java $JAVA_OPTS -jar /app/app.jar /app/config/application.properties"
+    networks:
+      - das-net
+
+networks:
+  das-net:
+    driver: bridge

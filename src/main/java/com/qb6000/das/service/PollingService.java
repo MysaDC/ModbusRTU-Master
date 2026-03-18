@@ -30,11 +30,11 @@ public final class PollingService implements Closeable {
     private final ScheduledExecutorService scheduler;
 
     public PollingService(String controllerId,
-                          String controllerIp,
-                          long pollIntervalMs,
-                          ModbusReader modbusReader,
-                          MqttPublisher mqttPublisher,
-                          ObjectMapper objectMapper) {
+                        String controllerIp,
+                        long pollIntervalMs,
+                        ModbusReader modbusReader,
+                        MqttPublisher mqttPublisher,
+                        ObjectMapper objectMapper) {
         this.controllerId = controllerId;
         this.controllerIp = controllerIp;
         this.pollIntervalMs = pollIntervalMs;
@@ -49,7 +49,7 @@ public final class PollingService implements Closeable {
     }
 
     public void start() {
-        log.info("Starting polling service, controllerId={}, ip={}, interval={}ms", controllerId, controllerIp, pollIntervalMs);
+        log.info("开始轮询，控制器：{}，IP：{}，周期：{}ms", controllerId, controllerIp, pollIntervalMs);
         scheduler.scheduleWithFixedDelay(this::pollAndPublish, 0, pollIntervalMs, TimeUnit.MILLISECONDS);
     }
 
@@ -62,17 +62,17 @@ public final class PollingService implements Closeable {
             mqttPublisher.publishAsync(payload).whenComplete((unused, throwable) -> {
                 if (throwable != null) {
                     Throwable root = unwrap(throwable);
-                    log.error("Failed to publish MQTT message, controllerId={}, ip={}: {}",
+                    log.error("MQTT 发布失败，控制器：{}，IP：{}，原因：{}",
                         controllerId, controllerIp, root.getMessage(), root);
                     return;
                 }
-                log.info("Telemetry published, controllerId={}, ip={}, channelCount={}",
+                log.info("遥测数据发布成功，控制器：{}，IP：{}，通道数：{}",
                     controllerId, controllerIp, channels.size());
             });
         } catch (IOException ex) {
-            log.error("Failed to read Modbus data, controllerId={}, ip={}: {}", controllerId, controllerIp, ex.getMessage(), ex);
+            log.error("Modbus 读取失败，控制器：{}，IP：{}，原因：{}", controllerId, controllerIp, ex.getMessage(), ex);
         } catch (Exception ex) {
-            log.error("Unexpected error in polling workflow, controllerId={}, ip={}", controllerId, controllerIp, ex);
+            log.error("轮询流程发生未预期异常，控制器：{}，IP：{}", controllerId, controllerIp, ex);
         }
     }
 
@@ -85,7 +85,7 @@ public final class PollingService implements Closeable {
         scheduler.shutdownNow();
         try {
             if (!scheduler.awaitTermination(3, TimeUnit.SECONDS)) {
-                log.warn("Polling scheduler did not stop within timeout, controllerId={}, ip={}", controllerId, controllerIp);
+                log.warn("轮询线程未在超时时间内停止，控制器：{}，IP：{}", controllerId, controllerIp);
             }
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();

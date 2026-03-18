@@ -50,15 +50,15 @@ public final class Main {
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            log.info("Shutdown signal received, stopping service...");
+            log.info("接收到停机信号，正在停止服务...");
             closeAll(pollingServices);
             closeAll(modbusReaders);
             mqttPublisher.close();
-            log.info("Service stopped.");
+            log.info("服务已停止。");
         }));
 
         pollingServices.forEach(PollingService::start);
-        log.info("QB6000 data acquisition service started with {} controller(s), config={}",
+        log.info("QB6000 采集服务已启动，控制器数量：{}，配置文件：{}",
             config.controllers().size(), configPath.toAbsolutePath());
 
         new CountDownLatch(1).await();
@@ -69,7 +69,7 @@ public final class Main {
             try {
                 closeable.close();
             } catch (Exception ex) {
-                log.warn("Error while closing resource: {}", ex.getMessage());
+                log.warn("关闭资源时发生异常：{}", ex.getMessage());
             }
         }
     }

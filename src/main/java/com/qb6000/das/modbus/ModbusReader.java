@@ -37,14 +37,15 @@ public final class ModbusReader implements Closeable {
                 connectIfNeeded();
                 return doReadChannels();
             } catch (Exception ex) {
-                lastError = new IOException("Modbus read failed on attempt " + attempt, ex);
-                log.warn("Modbus read failed, endpoint={}, attempt={}/{}: {}", endpoint, attempt, config.maxRetries(), ex.getMessage());
+                lastError = new IOException("Modbus 读取失败，第 " + attempt + " 次重试", ex);
+                log.warn("Modbus 读取失败，端点：{}，重试次数：{}/{}，原因：{}",
+                    endpoint, attempt, config.maxRetries(), ex.getMessage());
                 disconnectQuietly();
                 sleepBackoffIfNeeded(attempt);
             }
         }
 
-        throw lastError == null ? new IOException("Modbus read failed") : lastError;
+        throw lastError == null ? new IOException("Modbus 读取失败") : lastError;
     }
 
     private List<ChannelData> doReadChannels() throws ModbusException {
@@ -59,7 +60,7 @@ public final class ModbusReader implements Closeable {
             int readRegister = startRegister + offset;
             Register[] block = master.readMultipleRegisters(config.unitId(), readRegister, blockSize);
             if (block == null || block.length != blockSize) {
-                throw new ModbusException("Invalid Modbus response length");
+                throw new ModbusException("Modbus 响应长度无效");
             }
 
             for (int i = 0; i < block.length; i++) {
@@ -77,11 +78,11 @@ public final class ModbusReader implements Closeable {
         if (master != null && master.isConnected()) {
             return;
         }
-        log.info("Connecting Modbus TCP {} (unit-id={})", endpoint, config.unitId());
+        log.info("正在连接 Modbus TCP，端点：{}，单元ID：{}", endpoint, config.unitId());
         master = new ModbusTCPMaster(config.host(), config.port());
         master.setTimeout(config.timeoutMillis());
         master.connect();
-        log.info("Modbus TCP connected, endpoint={}", endpoint);
+        log.info("Modbus TCP 连接成功，端点：{}", endpoint);
     }
 
     private void sleepBackoffIfNeeded(int attempt) {

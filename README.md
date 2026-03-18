@@ -47,6 +47,18 @@ java -jar target/modbusmaster-1.0.0-shaded.jar
 java -jar target/modbusmaster-1.0.0-shaded.jar D:/deploy/application.properties
 ```
 
+### Docker Compose 启动
+
+```bash
+docker compose up -d --build
+```
+
+停止：
+
+```bash
+docker compose down
+```
+
 ## 4. MQTT 报文示例
 
 ```json
