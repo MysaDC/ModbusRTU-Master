@@ -35,11 +35,15 @@ public final class MqttPublisher implements Closeable {
         this.config = config;
     }
 
-    public synchronized void connect() throws MqttException {
+    public synchronized void connect() {
         if (closed.get()) {
             throw new IllegalStateException("MQTT 发布器已关闭");
         }
-        connectIfNeeded();
+        try {
+            connectIfNeeded();
+        } catch (MqttException ex) {
+            throw new IllegalStateException(formatMqttError(ex), ex);
+        }
     }
 
     public CompletableFuture<Void> publishAsync(String payload) {
@@ -127,5 +131,11 @@ public final class MqttPublisher implements Closeable {
         }
 
         client = null;
+    }
+
+    private static String formatMqttError(MqttException ex) {
+        Throwable cause = ex.getCause();
+        String causeType = cause == null ? "未知" : cause.getClass().getSimpleName();
+        return "MQTT 连接失败，错误码：" + ex.getReasonCode() + "，根因：" + causeType;
     }
 }

@@ -33,7 +33,7 @@ public final class ConfigLoader {
             getString(properties, "mqtt.broker-uri", "tcp://127.0.0.1:1883"),
             getString(properties, "mqtt.client-id", "qb6000-das"),
             getString(properties, "mqtt.topic", "emergency/qb6000/telemetry"),
-            getInt(properties, "mqtt.qos", 1),
+            getInt(properties, "mqtt.qos", 2),
             getBoolean(properties, "mqtt.retain", false),
             getString(properties, "mqtt.username", ""),
             getString(properties, "mqtt.password", ""),

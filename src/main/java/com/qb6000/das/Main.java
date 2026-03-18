@@ -22,7 +22,16 @@ public final class Main {
     private Main() {
     }
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
+        try {
+            run(args);
+        } catch (Exception ex) {
+            log.error("程序启动失败，原因：{}", ex.getMessage(), ex);
+            System.exit(1);
+        }
+    }
+
+    private static void run(String[] args) throws Exception {
         Path configPath = args.length > 0 ? Path.of(args[0]) : Path.of("config", "application.properties");
         ServiceConfig config = ConfigLoader.load(configPath);
 

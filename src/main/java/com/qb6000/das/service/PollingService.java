@@ -6,6 +6,7 @@ import com.qb6000.das.model.ChannelData;
 import com.qb6000.das.model.TelemetryMessage;
 import com.qb6000.das.modbus.ModbusReader;
 import com.qb6000.das.mqtt.MqttPublisher;
+import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +64,7 @@ public final class PollingService implements Closeable {
                 if (throwable != null) {
                     Throwable root = unwrap(throwable);
                     log.error("MQTT 发布失败，控制器：{}，IP：{}，原因：{}",
-                        controllerId, controllerIp, root.getMessage(), root);
+                        controllerId, controllerIp, buildErrorMessage(root), root);
                     return;
                 }
                 log.info("遥测数据发布成功，控制器：{}，IP：{}，通道数：{}",
@@ -105,5 +106,14 @@ public final class PollingService implements Closeable {
             current = current.getCause();
         }
         return current;
+    }
+
+    private static String buildErrorMessage(Throwable throwable) {
+        if (throwable instanceof MqttException mqttException) {
+            Throwable cause = mqttException.getCause();
+            String causeType = cause == null ? "未知" : cause.getClass().getSimpleName();
+            return "MQTT 错误码：" + mqttException.getReasonCode() + "，根因：" + causeType;
+        }
+        return throwable.getMessage();
     }
 }
