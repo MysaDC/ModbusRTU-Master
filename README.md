@@ -55,10 +55,10 @@ java -jar target/modbusmaster-1.0.0-shaded.jar D:/deploy/application.properties
   "timestamp": "2026-03-18T07:00:00Z",
   "channels": [
     {
-      "channel": 1,
-      "register": 101,
-      "rawValue": 35,
-      "concentration": 35.0
+      "channel": 1,             //探头通道号（从 1 开始的逻辑编号）
+      "register": 101,          //该通道对应的 Modbus 寄存器地址（这里 101 即 0x0065）
+      "rawValue": 35,           //从寄存器直接读出来的原始整数值（未换算）
+      "concentration": 35.0     //按配置换算后的浓度值
     }
   ]
 }
@@ -68,5 +68,5 @@ java -jar target/modbusmaster-1.0.0-shaded.jar D:/deploy/application.properties
 
 - 单次读取最多 125 个寄存器，程序已自动分包读取（兼容 128 通道）
 - Modbus 读取失败会按 `modbus.max-retries` 重试
-- MQTT 使用自动重连
+- MQTT 发布采用异步队列 + 自动重连
 - 多控制器数据统一发布到同一 topic，通过 `controllerIp` 区分来源

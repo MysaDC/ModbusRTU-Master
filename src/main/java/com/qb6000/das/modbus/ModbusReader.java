@@ -2,6 +2,7 @@ package com.qb6000.das.modbus;
 
 import com.ghgande.j2mod.modbus.ModbusException;
 import com.ghgande.j2mod.modbus.facade.ModbusTCPMaster;
+import com.ghgande.j2mod.modbus.procimg.Register;
 import com.qb6000.das.config.ServiceConfig;
 import com.qb6000.das.model.ChannelData;
 import org.slf4j.Logger;
@@ -56,13 +57,13 @@ public final class ModbusReader implements Closeable {
         while (offset < totalChannels) {
             int blockSize = Math.min(MAX_READ_REGISTERS_PER_REQUEST, totalChannels - offset);
             int readRegister = startRegister + offset;
-            int[] block = master.readMultipleRegisters(config.unitId(), readRegister, blockSize);
+            Register[] block = master.readMultipleRegisters(config.unitId(), readRegister, blockSize);
             if (block == null || block.length != blockSize) {
                 throw new ModbusException("Invalid Modbus response length");
             }
 
             for (int i = 0; i < block.length; i++) {
-                int raw = block[i] & 0xFFFF;
+                int raw = block[i].getValue() & 0xFFFF;
                 int register = readRegister + i;
                 double concentration = raw * concentrationConfig.scale() + concentrationConfig.offset();
                 result.add(new ChannelData(currentChannel++, register, raw, concentration));

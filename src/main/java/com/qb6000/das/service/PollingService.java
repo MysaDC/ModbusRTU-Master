@@ -6,7 +6,6 @@ import com.qb6000.das.model.ChannelData;
 import com.qb6000.das.model.TelemetryMessage;
 import com.qb6000.das.modbus.ModbusReader;
 import com.qb6000.das.mqtt.MqttPublisher;
-import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,12 +59,18 @@ public final class PollingService implements Closeable {
             List<ChannelData> channels = modbusReader.readChannels();
             TelemetryMessage telemetryMessage = new TelemetryMessage(controllerIp, now, channels);
             String payload = serialize(telemetryMessage);
-            mqttPublisher.publish(payload);
-            log.info("Telemetry published, controllerId={}, ip={}, channelCount={}", controllerId, controllerIp, channels.size());
+            mqttPublisher.publishAsync(payload).whenComplete((unused, throwable) -> {
+                if (throwable != null) {
+                    Throwable root = unwrap(throwable);
+                    log.error("Failed to publish MQTT message, controllerId={}, ip={}: {}",
+                        controllerId, controllerIp, root.getMessage(), root);
+                    return;
+                }
+                log.info("Telemetry published, controllerId={}, ip={}, channelCount={}",
+                    controllerId, controllerIp, channels.size());
+            });
         } catch (IOException ex) {
             log.error("Failed to read Modbus data, controllerId={}, ip={}: {}", controllerId, controllerIp, ex.getMessage(), ex);
-        } catch (MqttException ex) {
-            log.error("Failed to publish MQTT message, controllerId={}, ip={}: {}", controllerId, controllerIp, ex.getMessage(), ex);
         } catch (Exception ex) {
             log.error("Unexpected error in polling workflow, controllerId={}, ip={}", controllerId, controllerIp, ex);
         }
@@ -92,5 +97,13 @@ public final class PollingService implements Closeable {
             return "controller";
         }
         return value.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
+    private static Throwable unwrap(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
     }
 }

@@ -11,11 +11,23 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MqttPublisher implements Closeable {
     private static final Logger log = LoggerFactory.getLogger(MqttPublisher.class);
 
     private final ServiceConfig.MqttConfig config;
+    private final ExecutorService publishExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "mqtt-publisher");
+        thread.setDaemon(false);
+        return thread;
+    });
+    private final AtomicBoolean closed = new AtomicBoolean(false);
 
     private MqttClient client;
 
@@ -23,7 +35,21 @@ public final class MqttPublisher implements Closeable {
         this.config = config;
     }
 
-    public synchronized void publish(String payload) throws MqttException {
+    public CompletableFuture<Void> publishAsync(String payload) {
+        if (closed.get()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("MqttPublisher is closed"));
+        }
+
+        return CompletableFuture.runAsync(() -> {
+            try {
+                publishInternal(payload);
+            } catch (MqttException ex) {
+                throw new CompletionException(ex);
+            }
+        }, publishExecutor);
+    }
+
+    private synchronized void publishInternal(String payload) throws MqttException {
         connectIfNeeded();
         MqttMessage message = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
         message.setQos(config.qos());
@@ -31,7 +57,7 @@ public final class MqttPublisher implements Closeable {
         client.publish(config.topic(), message);
     }
 
-    private void connectIfNeeded() throws MqttException {
+    private synchronized void connectIfNeeded() throws MqttException {
         if (client != null && client.isConnected()) {
             return;
         }
@@ -55,7 +81,26 @@ public final class MqttPublisher implements Closeable {
     }
 
     @Override
-    public synchronized void close() {
+    public void close() {
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
+
+        publishExecutor.shutdown();
+        try {
+            if (!publishExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                log.warn("MQTT publish executor did not stop in time, forcing shutdown");
+                publishExecutor.shutdownNow();
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            publishExecutor.shutdownNow();
+        }
+
+        closeClient();
+    }
+
+    private synchronized void closeClient() {
         if (client == null) {
             return;
         }
