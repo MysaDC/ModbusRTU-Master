@@ -58,6 +58,17 @@ public final class ConfigLoader {
         int defaultTimeoutMs = getInt(properties, "modbus.timeout.ms", 3000);
         int defaultMaxRetries = getInt(properties, "modbus.max-retries", 3);
         int defaultRetryBackoffMs = getInt(properties, "modbus.retry-backoff.ms", 1000);
+        boolean defaultCrcCheckEnabled = getBoolean(properties, "modbus.crc-check.enabled", false);
+        boolean defaultCrcFailureImmediateRetryEnabled = getBoolean(
+            properties,
+            "modbus.crc-failure.immediate-retry",
+            true
+        );
+        int defaultCrcFailureMaxRetriesUntilNextPoll = getInt(
+            properties,
+            "modbus.crc-failure.max-retries-until-next-poll",
+            3
+        );
 
         Set<Integer> controllerIndexes = resolveControllerIndexes(properties);
         List<ServiceConfig.ControllerConfig> controllers = new ArrayList<>();
@@ -71,7 +82,10 @@ public final class ConfigLoader {
                 defaultChannelCount,
                 defaultTimeoutMs,
                 defaultMaxRetries,
-                Duration.ofMillis(defaultRetryBackoffMs)
+                Duration.ofMillis(defaultRetryBackoffMs),
+                defaultCrcCheckEnabled,
+                defaultCrcFailureImmediateRetryEnabled,
+                defaultCrcFailureMaxRetriesUntilNextPoll
             );
 
             controllers.add(new ServiceConfig.ControllerConfig(
@@ -92,6 +106,21 @@ public final class ConfigLoader {
             int timeoutMs = getInt(properties, prefix + "timeout.ms", defaultTimeoutMs);
             int maxRetries = getInt(properties, prefix + "max-retries", defaultMaxRetries);
             int retryBackoffMs = getInt(properties, prefix + "retry-backoff.ms", defaultRetryBackoffMs);
+            boolean crcCheckEnabled = getBoolean(
+                properties,
+                prefix + "crc-check.enabled",
+                defaultCrcCheckEnabled
+            );
+            boolean crcFailureImmediateRetryEnabled = getBoolean(
+                properties,
+                prefix + "crc-failure.immediate-retry",
+                defaultCrcFailureImmediateRetryEnabled
+            );
+            int crcFailureMaxRetriesUntilNextPoll = getInt(
+                properties,
+                prefix + "crc-failure.max-retries-until-next-poll",
+                defaultCrcFailureMaxRetriesUntilNextPoll
+            );
 
             ServiceConfig.ModbusConfig modbusConfig = new ServiceConfig.ModbusConfig(
                 host,
@@ -101,7 +130,10 @@ public final class ConfigLoader {
                 channelCount,
                 timeoutMs,
                 maxRetries,
-                Duration.ofMillis(retryBackoffMs)
+                Duration.ofMillis(retryBackoffMs),
+                crcCheckEnabled,
+                crcFailureImmediateRetryEnabled,
+                crcFailureMaxRetriesUntilNextPoll
             );
 
             String controllerId = getString(properties, prefix + "id", host);

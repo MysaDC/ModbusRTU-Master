@@ -75,6 +75,9 @@ public final class ServiceConfig {
         private final int timeoutMillis;
         private final int maxRetries;
         private final Duration retryBackoff;
+        private final boolean crcCheckEnabled;
+        private final boolean crcFailureImmediateRetryEnabled;
+        private final int crcFailureMaxRetriesUntilNextPoll;
 
         public ModbusConfig(String host,
                             int port,
@@ -83,7 +86,10 @@ public final class ServiceConfig {
                             int channelCount,
                             int timeoutMillis,
                             int maxRetries,
-                            Duration retryBackoff) {
+                            Duration retryBackoff,
+                            boolean crcCheckEnabled,
+                            boolean crcFailureImmediateRetryEnabled,
+                            int crcFailureMaxRetriesUntilNextPoll) {
             this.host = requireNonBlank(host, "modbus.host");
             if (port < 1 || port > 65535) {
                 throw new IllegalArgumentException("modbus.port must be between 1 and 65535");
@@ -106,6 +112,9 @@ public final class ServiceConfig {
             if (retryBackoff == null || retryBackoff.isNegative()) {
                 throw new IllegalArgumentException("modbus.retry-backoff.ms must be >= 0");
             }
+            if (crcFailureMaxRetriesUntilNextPoll < 1) {
+                throw new IllegalArgumentException("modbus.crc-failure.max-retries-until-next-poll must be >= 1");
+            }
             this.port = port;
             this.unitId = unitId;
             this.startRegister = startRegister;
@@ -113,6 +122,9 @@ public final class ServiceConfig {
             this.timeoutMillis = timeoutMillis;
             this.maxRetries = maxRetries;
             this.retryBackoff = retryBackoff;
+            this.crcCheckEnabled = crcCheckEnabled;
+            this.crcFailureImmediateRetryEnabled = crcFailureImmediateRetryEnabled;
+            this.crcFailureMaxRetriesUntilNextPoll = crcFailureMaxRetriesUntilNextPoll;
         }
 
         public String host() {
@@ -145,6 +157,18 @@ public final class ServiceConfig {
 
         public Duration retryBackoff() {
             return retryBackoff;
+        }
+
+        public boolean crcCheckEnabled() {
+            return crcCheckEnabled;
+        }
+
+        public boolean crcFailureImmediateRetryEnabled() {
+            return crcFailureImmediateRetryEnabled;
+        }
+
+        public int crcFailureMaxRetriesUntilNextPoll() {
+            return crcFailureMaxRetriesUntilNextPoll;
         }
     }
 

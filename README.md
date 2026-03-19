@@ -30,6 +30,9 @@ mvn clean package
 - `controllers.count`：控制器数量（可选，便于显式声明）
 - `controllers.N.host/port/unit-id/start-register/channel-count`：多控制器
 - `modbus.*`：控制器默认参数（可被 `controllers.N.*` 覆盖）
+- `modbus.crc-check.enabled`：启用串口服务器 RTU CRC 校验过滤
+- `modbus.crc-failure.immediate-retry`：CRC 失败后是否立即重试整帧
+- `modbus.crc-failure.max-retries-until-next-poll`：整帧在本轮到下轮前最大重试次数
 - `mqtt.broker-uri/topic/qos`
 - `concentration.scale/offset`
 
@@ -80,5 +83,6 @@ docker compose down
 
 - 单次读取最多 125 个寄存器，程序已自动分包读取（兼容 128 通道）
 - Modbus 读取失败会按 `modbus.max-retries` 重试
+- 启用 `modbus.crc-check.enabled=true` 后，按整帧（最多125通道）请求并对每帧进行 CRC 校验；CRC 不通过的整帧会被丢弃并按配置重试
 - MQTT 发布采用异步队列 + 自动重连
 - 多控制器数据统一发布到同一 topic，通过 `controllerIp` 区分来源
