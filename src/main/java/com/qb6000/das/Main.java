@@ -17,6 +17,10 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 public final class Main {
+    static {
+        initLogCharset();
+    }
+
     private static final Logger log = LoggerFactory.getLogger(Main.class);
 
     private Main() {
@@ -84,5 +88,31 @@ public final class Main {
                 log.warn("关闭资源时发生异常：{}", ex.getMessage());
             }
         }
+    }
+
+    private static void initLogCharset() {
+        if (hasText(System.getProperty("LOG_CHARSET"))) {
+            return;
+        }
+        String charset = firstNonBlank(
+            System.getProperty("stdout.encoding"),
+            System.getProperty("sun.stdout.encoding"),
+            System.getProperty("file.encoding"),
+            "UTF-8"
+        );
+        System.setProperty("LOG_CHARSET", charset);
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (hasText(value)) {
+                return value.trim();
+            }
+        }
+        return "UTF-8";
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

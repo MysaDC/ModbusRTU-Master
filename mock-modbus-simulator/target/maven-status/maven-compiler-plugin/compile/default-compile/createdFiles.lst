@@ -1,0 +1,6 @@
+com\qb6000\mock\MockConfigLoader.class
+com\qb6000\mock\MockModbusSimulatorMain.class
+com\qb6000\mock\MockModbusSimulatorMain$RunningSlave.class
+com\qb6000\mock\MockConfig.class
+com\qb6000\mock\MockConfig$ControllerMockConfig.class
+com\qb6000\mock\RandomRegister.class
