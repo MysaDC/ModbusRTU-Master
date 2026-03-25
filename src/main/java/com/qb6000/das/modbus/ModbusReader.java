@@ -74,10 +74,12 @@ public final class ModbusReader implements Closeable {
         while (offset < totalChannels) {
             int blockSize = Math.min(MAX_READ_REGISTERS_PER_REQUEST, totalChannels - offset);
             int readRegister = startRegister + offset;
+            logTcpFrameRequest(readRegister, blockSize);
             Register[] block = master.readMultipleRegisters(config.unitId(), readRegister, blockSize);
             if (block == null || block.length != blockSize) {
                 throw new ModbusException("Modbus 响应长度无效");
             }
+            logTcpFrameResponse(block);
 
             for (int i = 0; i < block.length; i++) {
                 int raw = block[i].getValue() & 0xFFFF;
@@ -187,6 +189,7 @@ public final class ModbusReader implements Closeable {
 
     private int[] readRegistersBlockWithCrc(int startRegister, int quantity) throws IOException {
         byte[] request = buildReadRegistersRequest(config.unitId(), startRegister, quantity);
+        logRtuFrame("发送", request);
         rtuOutput.write(request);
         rtuOutput.flush();
 
@@ -215,6 +218,7 @@ public final class ModbusReader implements Closeable {
                 (byte) readUnsignedByteOrThrow("读取异常响应 CRC 低字节失败"),
                 (byte) readUnsignedByteOrThrow("读取异常响应 CRC 高字节失败")
             };
+            logRtuFrame("接收", frame);
             validateFrameCrc(frame);
             throw new IOException(String.format("从站异常响应，功能码=0x%02X，异常码=0x%02X", function, exceptionCode));
         }
@@ -226,6 +230,7 @@ public final class ModbusReader implements Closeable {
         frame[2] = (byte) byteCount;
         rtuInput.readFully(frame, 3, byteCount + 2);
 
+        logRtuFrame("接收", frame);
         validateFrameCrc(frame);
         return frame;
     }
@@ -336,6 +341,53 @@ public final class ModbusReader implements Closeable {
             builder.append(String.format("%02X", data[i] & 0xFF));
         }
         return builder.toString();
+    }
+
+    private void logTcpFrameRequest(int startRegister, int quantity) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
+        byte[] requestPdu = buildReadRegistersPdu(config.unitId(), startRegister, quantity);
+        log.debug("Modbus 原始指令[发送][TCP]，端点：{}，hex={}", endpoint, toHex(requestPdu));
+    }
+
+    private void logTcpFrameResponse(Register[] block) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
+        byte[] responsePdu = buildReadRegistersResponsePdu(config.unitId(), block);
+        log.debug("Modbus 原始指令[接收][TCP]，端点：{}，hex={}", endpoint, toHex(responsePdu));
+    }
+
+    private void logRtuFrame(String direction, byte[] frame) {
+        if (!log.isDebugEnabled()) {
+            return;
+        }
+        log.debug("Modbus 原始指令[{}][RTU-over-TCP]，端点：{}，hex={}", direction, endpoint, toHex(frame));
+    }
+
+    private static byte[] buildReadRegistersPdu(int unitId, int startRegister, int quantity) {
+        return new byte[] {
+            (byte) unitId,
+            (byte) READ_HOLDING_REGISTERS_FUNCTION,
+            (byte) ((startRegister >>> 8) & 0xFF),
+            (byte) (startRegister & 0xFF),
+            (byte) ((quantity >>> 8) & 0xFF),
+            (byte) (quantity & 0xFF)
+        };
+    }
+
+    private static byte[] buildReadRegistersResponsePdu(int unitId, Register[] block) {
+        byte[] response = new byte[3 + block.length * 2];
+        response[0] = (byte) unitId;
+        response[1] = (byte) READ_HOLDING_REGISTERS_FUNCTION;
+        response[2] = (byte) (block.length * 2);
+        for (int i = 0; i < block.length; i++) {
+            int value = block[i].getValue() & 0xFFFF;
+            response[3 + i * 2] = (byte) ((value >>> 8) & 0xFF);
+            response[4 + i * 2] = (byte) (value & 0xFF);
+        }
+        return response;
     }
 
     private void connectTcpMasterIfNeeded() throws Exception {

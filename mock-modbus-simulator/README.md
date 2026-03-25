@@ -27,6 +27,7 @@ java -jar target/mock-modbus-simulator-1.0.0.jar D:/mock/mock-controllers.proper
 ## 配置说明
 
 - `controller.count`：控制器数量
+- `tcp.rtu-over-tcp.enabled`：是否启用 RTU over TCP（启用后响应帧包含 CRC）
 - `controller.N.port`：第 N 个控制器监听端口
 - `controller.N.unit-id`：Modbus 从站地址
 - `controller.N.start-register`：探头起始寄存器（默认 101）

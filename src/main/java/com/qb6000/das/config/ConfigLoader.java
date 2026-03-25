@@ -58,6 +58,7 @@ public final class ConfigLoader {
         int defaultTimeoutMs = getInt(properties, "modbus.timeout.ms", 3000);
         int defaultMaxRetries = getInt(properties, "modbus.max-retries", 3);
         int defaultRetryBackoffMs = getInt(properties, "modbus.retry-backoff.ms", 1000);
+        boolean defaultHexLogEnabled = getBoolean(properties, "modbus.hex-log.enabled", false);
         boolean defaultCrcCheckEnabled = getBoolean(properties, "modbus.crc-check.enabled", false);
         boolean defaultCrcFailureImmediateRetryEnabled = getBoolean(
             properties,
@@ -83,6 +84,7 @@ public final class ConfigLoader {
                 defaultTimeoutMs,
                 defaultMaxRetries,
                 Duration.ofMillis(defaultRetryBackoffMs),
+                defaultHexLogEnabled,
                 defaultCrcCheckEnabled,
                 defaultCrcFailureImmediateRetryEnabled,
                 defaultCrcFailureMaxRetriesUntilNextPoll
@@ -106,6 +108,11 @@ public final class ConfigLoader {
             int timeoutMs = getInt(properties, prefix + "timeout.ms", defaultTimeoutMs);
             int maxRetries = getInt(properties, prefix + "max-retries", defaultMaxRetries);
             int retryBackoffMs = getInt(properties, prefix + "retry-backoff.ms", defaultRetryBackoffMs);
+            boolean hexLogEnabled = getBoolean(
+                properties,
+                prefix + "hex-log.enabled",
+                defaultHexLogEnabled
+            );
             boolean crcCheckEnabled = getBoolean(
                 properties,
                 prefix + "crc-check.enabled",
@@ -131,6 +138,7 @@ public final class ConfigLoader {
                 timeoutMs,
                 maxRetries,
                 Duration.ofMillis(retryBackoffMs),
+                hexLogEnabled,
                 crcCheckEnabled,
                 crcFailureImmediateRetryEnabled,
                 crcFailureMaxRetriesUntilNextPoll

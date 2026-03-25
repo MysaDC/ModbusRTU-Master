@@ -84,5 +84,7 @@ docker compose down
 - 单次读取最多 125 个寄存器，程序已自动分包读取（兼容 128 通道）
 - Modbus 读取失败会按 `modbus.max-retries` 重试
 - 启用 `modbus.crc-check.enabled=true` 后，按整帧（最多125通道）请求并对每帧进行 CRC 校验；CRC 不通过的整帧会被丢弃并按配置重试
+- 若本轮无有效通道数据（如整帧全部失败），将跳过 MQTT 上报，避免“空数据成功上报”
+- 轮询日志包含 Modbus 原始发送/接收指令（hex）
 - MQTT 发布采用异步队列 + 自动重连
 - 多控制器数据统一发布到同一 topic，通过 `controllerIp` 区分来源

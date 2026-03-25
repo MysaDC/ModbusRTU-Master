@@ -40,9 +40,14 @@ public final class MockModbusSimulatorMain {
         List<RunningSlave> runningSlaves = new ArrayList<>();
 
         for (MockConfig.ControllerMockConfig controller : config.controllers()) {
-            RunningSlave runningSlave = startController(controller, config.workerThreads(), config.readTimeoutMillis());
+            RunningSlave runningSlave = startController(
+                controller,
+                config.workerThreads(),
+                config.readTimeoutMillis(),
+                config.rtuOverTcpEnabled()
+            );
             runningSlaves.add(runningSlave);
-            log.info("Mock 控制器已启动：id={}，监听地址={}:{}，unit-id={}，寄存器范围=[{}..{}]，探头数量={}，随机范围=[{}, {}]",
+            log.info("Mock 控制器已启动：id={}，监听地址={}:{}，unit-id={}，寄存器范围=[{}..{}]，探头数量={}，随机范围=[{}, {}]，RTU over TCP={}",
                 controller.id(),
                 controller.bindHost(),
                 controller.port(),
@@ -51,7 +56,8 @@ public final class MockModbusSimulatorMain {
                 controller.startRegister() + controller.probeCount() - 1,
                 controller.probeCount(),
                 controller.randomMin(),
-                controller.randomMax());
+                controller.randomMax(),
+                config.rtuOverTcpEnabled());
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -100,13 +106,14 @@ public final class MockModbusSimulatorMain {
 
     private static RunningSlave startController(MockConfig.ControllerMockConfig controller,
                                                 int workerThreads,
-                                                int readTimeoutMillis) throws Exception {
+                                                int readTimeoutMillis,
+                                                boolean rtuOverTcpEnabled) throws Exception {
         InetAddress bindAddress = InetAddress.getByName(controller.bindHost());
         ModbusSlave slave = ModbusSlaveFactory.createTCPSlave(
             bindAddress,
             controller.port(),
             workerThreads,
-            false,
+            rtuOverTcpEnabled,
             readTimeoutMillis
         );
 

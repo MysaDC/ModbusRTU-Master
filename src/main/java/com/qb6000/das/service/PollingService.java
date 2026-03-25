@@ -58,6 +58,10 @@ public final class PollingService implements Closeable {
         try {
             Instant now = Instant.now();
             List<ChannelData> channels = modbusReader.readChannels();
+            if (channels == null || channels.isEmpty()) {
+                log.warn("本轮无有效通道数据，跳过 MQTT 上报，控制器：{}，IP：{}", controllerId, controllerIp);
+                return;
+            }
             TelemetryMessage telemetryMessage = new TelemetryMessage(controllerIp, now, channels);
             String payload = serialize(telemetryMessage);
             mqttPublisher.publishAsync(payload).whenComplete((unused, throwable) -> {

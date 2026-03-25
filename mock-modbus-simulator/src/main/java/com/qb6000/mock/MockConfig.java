@@ -5,6 +5,7 @@ import java.util.List;
 public record MockConfig(
     int workerThreads,
     int readTimeoutMillis,
+    boolean rtuOverTcpEnabled,
     List<ControllerMockConfig> controllers
 ) {
     public MockConfig {

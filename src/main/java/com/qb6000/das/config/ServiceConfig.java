@@ -75,6 +75,7 @@ public final class ServiceConfig {
         private final int timeoutMillis;
         private final int maxRetries;
         private final Duration retryBackoff;
+        private final boolean hexLogEnabled;
         private final boolean crcCheckEnabled;
         private final boolean crcFailureImmediateRetryEnabled;
         private final int crcFailureMaxRetriesUntilNextPoll;
@@ -87,6 +88,7 @@ public final class ServiceConfig {
                             int timeoutMillis,
                             int maxRetries,
                             Duration retryBackoff,
+                            boolean hexLogEnabled,
                             boolean crcCheckEnabled,
                             boolean crcFailureImmediateRetryEnabled,
                             int crcFailureMaxRetriesUntilNextPoll) {
@@ -122,6 +124,7 @@ public final class ServiceConfig {
             this.timeoutMillis = timeoutMillis;
             this.maxRetries = maxRetries;
             this.retryBackoff = retryBackoff;
+            this.hexLogEnabled = hexLogEnabled;
             this.crcCheckEnabled = crcCheckEnabled;
             this.crcFailureImmediateRetryEnabled = crcFailureImmediateRetryEnabled;
             this.crcFailureMaxRetriesUntilNextPoll = crcFailureMaxRetriesUntilNextPoll;
@@ -157,6 +160,10 @@ public final class ServiceConfig {
 
         public Duration retryBackoff() {
             return retryBackoff;
+        }
+
+        public boolean hexLogEnabled() {
+            return hexLogEnabled;
         }
 
         public boolean crcCheckEnabled() {

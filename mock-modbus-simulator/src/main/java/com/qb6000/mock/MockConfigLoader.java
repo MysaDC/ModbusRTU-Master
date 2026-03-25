@@ -21,6 +21,7 @@ public final class MockConfigLoader {
         int controllerCount = getInt(properties, "controller.count", 1);
         int workerThreads = getInt(properties, "worker-threads", 8);
         int readTimeoutMillis = getInt(properties, "read-timeout-ms", 3000);
+        boolean rtuOverTcpEnabled = getBoolean(properties, "tcp.rtu-over-tcp.enabled", false);
 
         String defaultBindHost = getString(properties, "default.bind-host", "0.0.0.0");
         int defaultPort = getInt(properties, "default.port", 15020);
@@ -54,7 +55,7 @@ public final class MockConfigLoader {
             ));
         }
 
-        return new MockConfig(workerThreads, readTimeoutMillis, controllers);
+        return new MockConfig(workerThreads, readTimeoutMillis, rtuOverTcpEnabled, controllers);
     }
 
     private static String getString(Properties properties, String key, String defaultValue) {
@@ -67,5 +68,13 @@ public final class MockConfigLoader {
             return defaultValue;
         }
         return Integer.parseInt(value.trim());
+    }
+
+    private static boolean getBoolean(Properties properties, String key, boolean defaultValue) {
+        String value = properties.getProperty(key);
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        return Boolean.parseBoolean(value.trim());
     }
 }

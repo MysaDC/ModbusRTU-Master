@@ -6,6 +6,8 @@
         </encoder>
     </appender>
 
+    <logger name="com.qb6000.das.modbus.ModbusReader" level="DEBUG"/>
+
     <root level="INFO">
         <appender-ref ref="STDOUT"/>
     </root>
