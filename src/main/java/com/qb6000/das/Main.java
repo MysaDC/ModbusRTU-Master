@@ -44,8 +44,11 @@ public final class Main {
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
         MqttPublisher mqttPublisher = new MqttPublisher(config.mqtt());
-        mqttPublisher.connect();
-        log.info("MQTT 初始化连接成功。");
+        if (mqttPublisher.connect()) {
+            log.info("MQTT 初始化连接成功。");
+        } else {
+            log.warn("MQTT 初始化连接失败，将继续运行并跳过上报。");
+        }
 
         List<ModbusReader> modbusReaders = new ArrayList<>();
         List<PollingService> pollingServices = new ArrayList<>();

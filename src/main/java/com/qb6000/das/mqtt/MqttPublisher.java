@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -35,33 +34,43 @@ public final class MqttPublisher implements Closeable {
         this.config = config;
     }
 
-    public synchronized void connect() {
+    public synchronized boolean connect() {
         if (closed.get()) {
-            throw new IllegalStateException("MQTT 发布器已关闭");
+            log.warn("MQTT 发布器已关闭，无法建立连接");
+            return false;
         }
         try {
             connectIfNeeded();
+            return true;
         } catch (MqttException ex) {
-            throw new IllegalStateException(formatMqttError(ex), ex);
+            log.warn("{}", formatMqttError(ex), ex);
+            closeClient();
+            return false;
         }
     }
 
-    public CompletableFuture<Void> publishAsync(String payload) {
+    public CompletableFuture<Boolean> publishAsync(String payload) {
         if (closed.get()) {
-            return CompletableFuture.failedFuture(new IllegalStateException("MQTT 发布器已关闭"));
+            log.warn("MQTT 发布器已关闭，跳过本次上报");
+            return CompletableFuture.completedFuture(false);
         }
 
-        return CompletableFuture.runAsync(() -> {
+        return CompletableFuture.supplyAsync(() -> {
+            if (!connect()) {
+                return false;
+            }
             try {
                 publishInternal(payload);
+                return true;
             } catch (MqttException ex) {
-                throw new CompletionException(ex);
+                log.warn("MQTT 发布失败：{}", formatMqttError(ex), ex);
+                closeClient();
+                return false;
             }
         }, publishExecutor);
     }
 
     private synchronized void publishInternal(String payload) throws MqttException {
-        connectIfNeeded();
         MqttMessage message = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
         message.setQos(config.qos());
         message.setRetained(config.retain());

@@ -64,15 +64,20 @@ public final class PollingService implements Closeable {
             }
             TelemetryMessage telemetryMessage = new TelemetryMessage(controllerIp, now, channels);
             String payload = serialize(telemetryMessage);
-            mqttPublisher.publishAsync(payload).whenComplete((unused, throwable) -> {
+            mqttPublisher.publishAsync(payload).whenComplete((published, throwable) -> {
                 if (throwable != null) {
                     Throwable root = unwrap(throwable);
                     log.error("MQTT 发布失败，控制器：{}，IP：{}，原因：{}",
                         controllerId, controllerIp, buildErrorMessage(root), root);
                     return;
                 }
-                log.info("遥测数据发布成功，控制器：{}，IP：{}，通道数：{}",
-                    controllerId, controllerIp, channels.size());
+                if (Boolean.TRUE.equals(published)) {
+                    log.info("遥测数据发布成功，控制器：{}，IP：{}，通道数：{}",
+                        controllerId, controllerIp, channels.size());
+                } else {
+                    log.warn("MQTT 不可用，已跳过本次上报，控制器：{}，IP：{}，通道数：{}",
+                        controllerId, controllerIp, channels.size());
+                }
             });
         } catch (IOException ex) {
             log.error("Modbus 读取失败，控制器：{}，IP：{}，原因：{}", controllerId, controllerIp, ex.getMessage(), ex);
