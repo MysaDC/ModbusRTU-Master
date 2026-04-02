@@ -1,15 +1,16 @@
 # QB6000 Data Acquisition Service
 
-基于文档《开发文档.txt》《QB6000控制器通信协议.txt》实现的 Java 轻量级采集服务：
+基于《QB6000控制器通信协议》实现的 Java 轻量级采集服务：
 
 - 通过 **Modbus TCP** 周期性读取多个 QB6000 控制器寄存器（功能码 0x03）
-- 将寄存器值转换为气体浓度
+- 轮询读取寄存器值并解析转换为气体浓度
 - 组装 JSON 并发布到 MQTT Broker（同 topic）
 - 提供重试、断线重连、日志追踪
+- 经测试通过moxa串口服务器与驰诚电气的QB6000/QB2000主机完美对接
 
 ## 1. 构建
 
-运行环境要求：**JDK 25**。
+运行环境要求：**JRE 25**。
 
 ```bash
 mvn clean package
@@ -17,7 +18,6 @@ mvn clean package
 
 打包后可执行 Jar：
 
-- `target/modbusmaster-1.0.0.jar`
 - `target/modbusmaster-1.0.0-shaded.jar`（包含依赖，推荐）
 
 ## 2. 配置
@@ -48,18 +48,6 @@ java -jar target/modbusmaster-1.0.0-shaded.jar
 
 ```bash
 java -jar target/modbusmaster-1.0.0-shaded.jar D:/deploy/application.properties
-```
-
-### Docker Compose 启动
-
-```bash
-docker compose up -d --build
-```
-
-停止：
-
-```bash
-docker compose down
 ```
 
 ## 4. MQTT 报文示例
