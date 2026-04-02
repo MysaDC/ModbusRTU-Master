@@ -9,7 +9,7 @@
 
 ## 1. 构建
 
-运行环境要求：**JDK 21**。
+运行环境要求：**JDK 25**。
 
 ```bash
 mvn clean package
@@ -86,5 +86,7 @@ docker compose down
 - 启用 `modbus.crc-check.enabled=true` 后，按整帧（最多125通道）请求并对每帧进行 CRC 校验；CRC 不通过的整帧会被丢弃并按配置重试
 - 若本轮无有效通道数据（如整帧全部失败），将跳过 MQTT 上报，避免“空数据成功上报”
 - 轮询日志包含 Modbus 原始发送/接收指令（hex）
-- MQTT 发布采用异步队列 + 自动重连
+- MQTT 发布采用阻塞式调用 + 自动重连，结合虚拟线程避免传统线程池堆积
 - 多控制器数据统一发布到同一 topic，通过 `controllerIp` 区分来源
+- 轮询任务已改为“平台线程调度 + 虚拟线程执行”，适合在 JDK 25 下承载更多控制器
+- 默认关闭 Modbus Hex 帧日志，避免高频轮询时的额外字符串分配；需要排障时可配合 `modbus.hex-log.enabled=true` 使用

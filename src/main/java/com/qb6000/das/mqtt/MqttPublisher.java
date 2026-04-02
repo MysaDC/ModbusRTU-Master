@@ -11,21 +11,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MqttPublisher implements Closeable {
     private static final Logger log = LoggerFactory.getLogger(MqttPublisher.class);
 
     private final ServiceConfig.MqttConfig config;
-    private final ExecutorService publishExecutor = Executors.newSingleThreadExecutor(r -> {
-        Thread thread = new Thread(r, "mqtt-publisher");
-        thread.setDaemon(false);
-        return thread;
-    });
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     private MqttClient client;
@@ -49,35 +40,31 @@ public final class MqttPublisher implements Closeable {
         }
     }
 
-    public CompletableFuture<Boolean> publishAsync(String payload) {
+    public synchronized boolean publish(String payload) {
         if (closed.get()) {
             log.warn("MQTT 发布器已关闭，跳过本次上报");
-            return CompletableFuture.completedFuture(false);
+            return false;
         }
 
-        return CompletableFuture.supplyAsync(() -> {
-            if (!connect()) {
-                return false;
-            }
-            try {
-                publishInternal(payload);
-                return true;
-            } catch (MqttException ex) {
-                log.warn("MQTT 发布失败：{}", formatMqttError(ex), ex);
-                closeClient();
-                return false;
-            }
-        }, publishExecutor);
+        try {
+            connectIfNeeded();
+            publishInternal(payload);
+            return true;
+        } catch (MqttException ex) {
+            log.warn("MQTT 发布失败：{}", formatMqttError(ex), ex);
+            closeClient();
+            return false;
+        }
     }
 
-    private synchronized void publishInternal(String payload) throws MqttException {
+    private void publishInternal(String payload) throws MqttException {
         MqttMessage message = new MqttMessage(payload.getBytes(StandardCharsets.UTF_8));
         message.setQos(config.qos());
         message.setRetained(config.retain());
         client.publish(config.topic(), message);
     }
 
-    private synchronized void connectIfNeeded() throws MqttException {
+    private void connectIfNeeded() throws MqttException {
         if (client != null && client.isConnected()) {
             return;
         }
@@ -105,18 +92,6 @@ public final class MqttPublisher implements Closeable {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-
-        publishExecutor.shutdown();
-        try {
-            if (!publishExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
-                log.warn("MQTT 发布线程池未在超时时间内停止，执行强制关闭");
-                publishExecutor.shutdownNow();
-            }
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            publishExecutor.shutdownNow();
-        }
-
         closeClient();
     }
 

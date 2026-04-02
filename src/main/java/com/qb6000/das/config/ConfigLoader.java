@@ -1,7 +1,8 @@
 package com.qb6000.das.config;
 
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -23,8 +24,8 @@ public final class ConfigLoader {
     public static ServiceConfig load(Path file) throws IOException {
         Objects.requireNonNull(file, "file");
         Properties properties = new Properties();
-        try (InputStream inputStream = Files.newInputStream(file)) {
-            properties.load(inputStream);
+        try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            properties.load(reader);
         }
 
         Duration pollInterval = Duration.ofMillis(getInt(properties, "poll.interval.ms", 5000));

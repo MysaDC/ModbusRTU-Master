@@ -15,17 +15,31 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 
 public final class ModbusReader implements Closeable {
     private static final Logger log = LoggerFactory.getLogger(ModbusReader.class);
     private static final int MAX_READ_REGISTERS_PER_REQUEST = 125;
     private static final int READ_HOLDING_REGISTERS_FUNCTION = 0x03;
+    private static final HexFormat HEX_FORMAT = HexFormat.ofDelimiter(" ").withUpperCase();
 
     private final ServiceConfig.ModbusConfig config;
-    private final ServiceConfig.ConcentrationConfig concentrationConfig;
     private final String endpoint;
+    private final int unitId;
+    private final int channelCount;
+    private final int startRegister;
+    private final int timeoutMillis;
+    private final int maxRetries;
+    private final boolean hexLogEnabled;
+    private final boolean crcCheckEnabled;
+    private final boolean crcFailureImmediateRetryEnabled;
+    private final int crcFailureMaxRetriesUntilNextPoll;
+    private final long retryBackoffMillis;
+    private final double concentrationScale;
+    private final double concentrationOffset;
 
     private ModbusTCPMaster master;
     private Socket rtuSocket;
@@ -35,12 +49,23 @@ public final class ModbusReader implements Closeable {
     public ModbusReader(ServiceConfig.ModbusConfig config,
                         ServiceConfig.ConcentrationConfig concentrationConfig) {
         this.config = config;
-        this.concentrationConfig = concentrationConfig;
         this.endpoint = config.host() + ":" + config.port();
+        this.unitId = config.unitId();
+        this.channelCount = config.channelCount();
+        this.startRegister = config.startRegister();
+        this.timeoutMillis = config.timeoutMillis();
+        this.maxRetries = config.maxRetries();
+        this.hexLogEnabled = config.hexLogEnabled();
+        this.crcCheckEnabled = config.crcCheckEnabled();
+        this.crcFailureImmediateRetryEnabled = config.crcFailureImmediateRetryEnabled();
+        this.crcFailureMaxRetriesUntilNextPoll = config.crcFailureMaxRetriesUntilNextPoll();
+        this.retryBackoffMillis = config.retryBackoff().toMillis();
+        this.concentrationScale = concentrationConfig.scale();
+        this.concentrationOffset = concentrationConfig.offset();
     }
 
     public synchronized List<ChannelData> readChannels() throws IOException {
-        if (config.crcCheckEnabled()) {
+        if (crcCheckEnabled) {
             return readChannelsWithCrcFilter();
         }
         return readChannelsByBlockWithRetry();
@@ -48,14 +73,14 @@ public final class ModbusReader implements Closeable {
 
     private List<ChannelData> readChannelsByBlockWithRetry() throws IOException {
         IOException lastError = null;
-        for (int attempt = 1; attempt <= config.maxRetries(); attempt++) {
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 connectTcpMasterIfNeeded();
                 return doReadChannelsByBlock();
             } catch (Exception ex) {
                 lastError = new IOException("Modbus 读取失败，第 " + attempt + " 次重试", ex);
                 log.warn("Modbus 读取失败，端点：{}，重试次数：{}/{}，原因：{}",
-                    endpoint, attempt, config.maxRetries(), ex.getMessage());
+                    endpoint, attempt, maxRetries, ex.getMessage());
                 disconnectQuietly();
                 sleepBackoffIfNeeded(attempt);
             }
@@ -65,17 +90,15 @@ public final class ModbusReader implements Closeable {
     }
 
     private List<ChannelData> doReadChannelsByBlock() throws ModbusException {
-        int totalChannels = config.channelCount();
-        int startRegister = config.startRegister();
         int currentChannel = 1;
         int offset = 0;
-        List<ChannelData> result = new ArrayList<>(totalChannels);
+        List<ChannelData> result = new ArrayList<>(channelCount);
 
-        while (offset < totalChannels) {
-            int blockSize = Math.min(MAX_READ_REGISTERS_PER_REQUEST, totalChannels - offset);
+        while (offset < channelCount) {
+            int blockSize = Math.min(MAX_READ_REGISTERS_PER_REQUEST, channelCount - offset);
             int readRegister = startRegister + offset;
             logTcpFrameRequest(readRegister, blockSize);
-            Register[] block = master.readMultipleRegisters(config.unitId(), readRegister, blockSize);
+            Register[] block = master.readMultipleRegisters(unitId, readRegister, blockSize);
             if (block == null || block.length != blockSize) {
                 throw new ModbusException("Modbus 响应长度无效");
             }
@@ -84,7 +107,7 @@ public final class ModbusReader implements Closeable {
             for (int i = 0; i < block.length; i++) {
                 int raw = block[i].getValue() & 0xFFFF;
                 int register = readRegister + i;
-                double concentration = raw * concentrationConfig.scale() + concentrationConfig.offset();
+                double concentration = raw * concentrationScale + concentrationOffset;
                 result.add(new ChannelData(currentChannel++, register, raw, concentration));
             }
             offset += blockSize;
@@ -93,13 +116,11 @@ public final class ModbusReader implements Closeable {
     }
 
     private List<ChannelData> readChannelsWithCrcFilter() throws IOException {
-        int totalChannels = config.channelCount();
-        int startRegister = config.startRegister();
         int offset = 0;
-        List<ChannelData> result = new ArrayList<>(totalChannels);
+        List<ChannelData> result = new ArrayList<>(channelCount);
 
-        while (offset < totalChannels) {
-            int blockSize = Math.min(MAX_READ_REGISTERS_PER_REQUEST, totalChannels - offset);
+        while (offset < channelCount) {
+            int blockSize = Math.min(MAX_READ_REGISTERS_PER_REQUEST, channelCount - offset);
             int readRegister = startRegister + offset;
             int[] block = readBlockWithCrcPolicy(readRegister, blockSize);
             if (block == null) {
@@ -111,26 +132,26 @@ public final class ModbusReader implements Closeable {
                 int raw = block[i];
                 int register = readRegister + i;
                 int channel = offset + i + 1;
-                double concentration = raw * concentrationConfig.scale() + concentrationConfig.offset();
+                double concentration = raw * concentrationScale + concentrationOffset;
                 result.add(new ChannelData(channel, register, raw, concentration));
             }
             offset += blockSize;
         }
 
-        if (result.size() < totalChannels) {
+        if (result.size() < channelCount) {
             log.warn(
                 "本轮轮询存在被丢弃的整帧数据，端点：{}，成功通道数：{}，配置通道数：{}",
                 endpoint,
                 result.size(),
-                totalChannels
+                channelCount
             );
         }
         return result;
     }
 
     private int[] readBlockWithCrcPolicy(int startRegister, int quantity) {
-        int maxAttempts = config.crcFailureImmediateRetryEnabled()
-            ? config.crcFailureMaxRetriesUntilNextPoll()
+        int maxAttempts = crcFailureImmediateRetryEnabled
+            ? crcFailureMaxRetriesUntilNextPoll
             : 1;
 
         Exception lastError = null;
@@ -188,7 +209,7 @@ public final class ModbusReader implements Closeable {
     }
 
     private int[] readRegistersBlockWithCrc(int startRegister, int quantity) throws IOException {
-        byte[] request = buildReadRegistersRequest(config.unitId(), startRegister, quantity);
+        byte[] request = buildReadRegistersRequest(unitId, startRegister, quantity);
         logRtuFrame("发送", request);
         rtuOutput.write(request);
         rtuOutput.flush();
@@ -240,11 +261,11 @@ public final class ModbusReader implements Closeable {
         int function = response[1] & 0xFF;
         int byteCount = response[2] & 0xFF;
 
-        if (unitId != config.unitId()) {
+        if (unitId != this.unitId) {
             throw new IOException(
                 String.format(
                     "响应从站地址不匹配，期望=%d，实际=%d，起始寄存器=%d，数量=%d",
-                    config.unitId(),
+                    this.unitId,
                     unitId,
                     startRegister,
                     quantity
@@ -333,37 +354,34 @@ public final class ModbusReader implements Closeable {
     }
 
     private static String toHex(byte[] data) {
-        StringBuilder builder = new StringBuilder(data.length * 3);
-        for (int i = 0; i < data.length; i++) {
-            if (i > 0) {
-                builder.append(' ');
-            }
-            builder.append(String.format("%02X", data[i] & 0xFF));
-        }
-        return builder.toString();
+        return HEX_FORMAT.formatHex(data);
     }
 
     private void logTcpFrameRequest(int startRegister, int quantity) {
-        if (!log.isDebugEnabled()) {
+        if (!shouldLogHex()) {
             return;
         }
-        byte[] requestPdu = buildReadRegistersPdu(config.unitId(), startRegister, quantity);
+        byte[] requestPdu = buildReadRegistersPdu(unitId, startRegister, quantity);
         log.debug("Modbus 原始指令[发送][TCP]，端点：{}，hex={}", endpoint, toHex(requestPdu));
     }
 
     private void logTcpFrameResponse(Register[] block) {
-        if (!log.isDebugEnabled()) {
+        if (!shouldLogHex()) {
             return;
         }
-        byte[] responsePdu = buildReadRegistersResponsePdu(config.unitId(), block);
+        byte[] responsePdu = buildReadRegistersResponsePdu(unitId, block);
         log.debug("Modbus 原始指令[接收][TCP]，端点：{}，hex={}", endpoint, toHex(responsePdu));
     }
 
     private void logRtuFrame(String direction, byte[] frame) {
-        if (!log.isDebugEnabled()) {
+        if (!shouldLogHex()) {
             return;
         }
         log.debug("Modbus 原始指令[{}][RTU-over-TCP]，端点：{}，hex={}", direction, endpoint, toHex(frame));
+    }
+
+    private boolean shouldLogHex() {
+        return hexLogEnabled && log.isDebugEnabled();
     }
 
     private static byte[] buildReadRegistersPdu(int unitId, int startRegister, int quantity) {
@@ -394,9 +412,9 @@ public final class ModbusReader implements Closeable {
         if (master != null && master.isConnected()) {
             return;
         }
-        log.info("正在连接 Modbus TCP，端点：{}，单元ID：{}", endpoint, config.unitId());
+        log.info("正在连接 Modbus TCP，端点：{}，单元ID：{}", endpoint, unitId);
         master = new ModbusTCPMaster(config.host(), config.port());
-        master.setTimeout(config.timeoutMillis());
+        master.setTimeout(timeoutMillis);
         master.connect();
         log.info("Modbus TCP 连接成功，端点：{}", endpoint);
     }
@@ -416,27 +434,27 @@ public final class ModbusReader implements Closeable {
         socket.setReuseAddress(true);
         socket.setKeepAlive(true);
         socket.setTcpNoDelay(true);
-        socket.connect(new InetSocketAddress(config.host(), config.port()), config.timeoutMillis());
-        socket.setSoTimeout(config.timeoutMillis());
+        socket.connect(new InetSocketAddress(config.host(), config.port()), timeoutMillis);
+        socket.setSoTimeout(timeoutMillis);
 
         rtuSocket = socket;
         rtuInput = new DataInputStream(socket.getInputStream());
         rtuOutput = new DataOutputStream(socket.getOutputStream());
-        log.info("Modbus RTU over TCP 连接成功，端点：{}，单元ID：{}", endpoint, config.unitId());
+        log.info("Modbus RTU over TCP 连接成功，端点：{}，单元ID：{}", endpoint, unitId);
     }
 
     private void sleepBackoffIfNeeded(int attempt) {
-        if (attempt >= config.maxRetries()) {
+        if (attempt >= maxRetries) {
             return;
         }
-        sleepRetryBackoff(config.retryBackoff().toMillis());
+        sleepRetryBackoff(retryBackoffMillis);
     }
 
     private void sleepRetryBackoffIfNeeded(int attempt, int maxAttempts) {
         if (attempt >= maxAttempts) {
             return;
         }
-        sleepRetryBackoff(config.retryBackoff().toMillis());
+        sleepRetryBackoff(retryBackoffMillis);
     }
 
     private static void sleepRetryBackoff(long millis) {
@@ -444,7 +462,7 @@ public final class ModbusReader implements Closeable {
             return;
         }
         try {
-            Thread.sleep(millis);
+            Thread.sleep(Duration.ofMillis(millis));
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
         }
