@@ -1,20 +1,14 @@
 services:
   qb6000-das:
-    image: eclipse-temurin:21-jdk
+    image: eclipse-temurin:25-jre-jammy
     container_name: qb6000-das
     restart: unless-stopped
     working_dir: /app
     environment:
       TZ: Asia/Shanghai
-      JAVA_OPTS: "-Xms128m -Xmx1024m -Dfile.encoding=UTF-8"
+      JAVA_OPTS: "-Xms512m -Xmx1024m -Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8"
     volumes:
-      - ./target/modbusmaster.jar:/app/app.jar:ro
-      - ./config/application.properties:/app/config/application.properties:ro
+      - ./qb6000-das/modbusmaster-1.0.0-shaded.jar:/app/app.jar:ro
+      - ./qb6000-das/application.properties:/app/config/application.properties:ro
     command: >
       sh -c "java $JAVA_OPTS -jar /app/app.jar /app/config/application.properties"
-    networks:
-      - das-net
-
-networks:
-  das-net:
-    driver: bridge
